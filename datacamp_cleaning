@@ -1,0 +1,57 @@
+-- top_five_products_each_category
+
+-- CTE to find rankings
+WITH rankings AS (
+SELECT
+	p.category,
+	p.product_name,
+	SUM(o.sales) AS product_total_sales,
+	SUM(o.profit) AS product_total_profit,
+	RANK() OVER (PARTITION BY p.category ORDER BY SUM(o.sales) DESC) AS product_rank
+FROM products AS p
+	LEFT JOIN orders AS o
+	ON p.product_id = o.product_id
+GROUP BY p.category, p.product_name
+)
+
+SELECT
+	category,
+	product_name,
+	product_total_sales,
+	product_total_profit,
+	product_rank
+FROM rankings
+WHERE product_rank <=5 ;
+
+
+-- impute_missing_values
+
+WITH missing AS (
+SELECT 
+	product_id,
+	discount,
+	market,
+	region,
+	sales,
+	quantity
+FROM orders
+WHERE quantity IS NULL
+),
+
+
+unit_prices AS (
+	SELECT o.product_id,
+	CAST(o.sales / o.quantity AS NUMERIC) AS unit_price
+FROM orders AS o
+RIGHT JOIN missing AS m 
+	ON o.product_id = m.product_id
+	AND o.discount = m.discount
+WHERE o.quantity IS NOT NULL
+)
+
+SELECT 
+	DISTINCT m.*,
+	ROUND(CAST(m.sales AS NUMERIC) / up.unit_price,0) AS calculated_quantity
+FROM missing AS m
+INNER JOIN unit_prices AS up
+	ON m.product_id = up.product_id;
